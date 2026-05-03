@@ -9,13 +9,15 @@ from linebot.v3.messaging import (
     ReplyMessageRequest, TextMessage, FlexMessage, FlexContainer
 )
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
-import anthropic
+import google.generativeai as genai
 
 app = Flask(__name__)
 
 configuration = Configuration(access_token=os.environ["LINE_CHANNEL_ACCESS_TOKEN"])
 handler = WebhookHandler(os.environ["LINE_CHANNEL_SECRET"])
-claude = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 DOG_STYLES = {
     "โกลเด้น": "Golden Retriever",
@@ -50,7 +52,8 @@ HELP_TEXT = """สวัสดีครับ! บอทช่วยสร้า
    /หมา โกลเด้น  แล้วค่อยพิมพ์หัวข้อ
 
 3. /สไตล์  ดูสายพันธุ์ทั้งหมด
-4. /ตัวอย่าง ดูคลิปอ้างอิง"""
+4. /ตัวอย่าง ดูคลิปอ้างอิง
+5. /help ดูวิธีใช้"""
 
 
 def get_dog_style(user_id):
@@ -68,7 +71,7 @@ def generate_content(topic, dog_th, dog_en):
 - สายพันธุ์: {dog_th} ({dog_en})
 - สไตล์: การ์ตูน Chibi 2D น่ารัก ภาษาไทย สุภาพ
 
-ตอบกลับเป็น JSON เท่านั้น ไม่ต้องมี markdown หรือ backtick:
+ตอบกลับเป็น JSON เท่านั้น ห้ามมี markdown, backtick หรือข้อความอื่นนอกจาก JSON:
 {{
   "title": "ชื่อคลิป สั้น กระชับ",
   "script": [
@@ -79,17 +82,12 @@ def generate_content(topic, dog_th, dog_en):
     "ประโยคที่ 5 จบด้วย call to action"
   ],
   "capcut_prompt": "English prompt for CapCut AI, cute chibi 2D cartoon {dog_en}, kawaii style, pastel colors, talking to camera, soft lighting",
-  "capcut_style_tips": "tip1\\ntip2\\ntip3",
+  "capcut_style_tips": "• tip1\\n• tip2\\n• tip3",
   "hashtags": "#แฮชแท็ก1 #แฮชแท็ก2 #แฮชแท็ก3 #แฮชแท็ก4 #แฮชแท็ก5"
 }}"""
 
-    response = claude.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1000,
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    text = response.content[0].text.strip()
+    response = model.generate_content(prompt)
+    text = response.text.strip()
     text = re.sub(r"```json\s*|\s*```", "", text).strip()
     return json.loads(text)
 
